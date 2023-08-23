@@ -157,7 +157,7 @@ def get_file_list_for_repo(repo_name=''):
     return []
 
 # install a repo
-def rppi_install_by_repo(repo = '', proxy='', mirror=default_mirror):
+def rppi_install_by_repo(repo = '', upgrade = False, proxy='', mirror=default_mirror):
     set_proxy(proxy)
     if not rppi_update(mirror):
         print('update rppi failed')
@@ -168,20 +168,27 @@ def rppi_install_by_repo(repo = '', proxy='', mirror=default_mirror):
         print('find no recipes, now to exit')
         return
     repos = RppiParser.GetAllRecipesDependences(recipes[0])
-    print(f"total find {len(recipes)} recipes, now to install {recipes[0]['name']} {recipes[0]['repo']}")
+    if upgrade:
+        action = 'upgrade'
+    else:
+        action = 'install'
+    print(f"total find {len(recipes)} recipes, now to {action} {recipes[0]['name']} {recipes[0]['repo']}")
     for r in repos:
         local_path = r.split('/')[-1]
         local_path = f'{default_cache_dir}/{local_path}'
         if not clone_or_update_repo(mirror + '/' + r + '.git', local_path, False):
-            print(f'clone {repo} failed')
+            print(f'clone or upgrade {repo} failed')
             return
         conflicts = check_file_conflict(get_rime_user_dir(), local_path)
-        if not not conflicts:
+        if not not conflicts and not upgrade:
             print('conflicts:')
             for c in conflicts:
                 print(c)
         else:
-            print('no conflicts, now to copy files')
+            if upgrade:
+                print('now to upgrade files')
+            else:
+                print('no conflicts, now to copy files')
             dest = './' + get_rime_user_dir()
             src = local_path
             # todo: make exclude file list or include file list for repo
@@ -213,7 +220,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='sample')
     # add args 
-    parser.add_argument('command', choices=['update', 'install', 'i' ,'search', 's', 'list', 'l'], help='command')
+    parser.add_argument('command', choices=['update', 'install', 'i' ,'search', 's', 'list', 'l', 'upgrade', 'u'], help='command')
     parser.add_argument('value', nargs='?', help='target')
 
     parser.add_argument('-p', required=False, help="proxy url")
@@ -228,13 +235,19 @@ if __name__ == '__main__':
     if args.m != None:
         g_mirror = args.m
         #print(f'mirror {g_mirror}')
-
+    # update rppi index
     if args.command == 'update':
         rppi_update(mirror=g_mirror, proxy=g_proxy)
+    # install recipe by key word or repo name
     elif args.command in ['install', 'i']:
         rppi_install_by_repo(args.value, proxy=g_proxy, mirror=g_mirror)
+    # upgrade recipe by key word or repo name
+    elif args.command in ['upgrade', 'u']:
+        rppi_install_by_repo(args.value, upgrade = True, proxy=g_proxy, mirror=g_mirror)
+    # search repo info by key word
     elif args.command in ['search', 's']:
         rppi_search(value=args.value, proxy=g_proxy, mirror=g_mirror)
+    # todo: list info
     elif args.command in ['list', 'l']:
         pass
 

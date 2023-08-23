@@ -27,9 +27,11 @@ pip to get packages, with
 
 [get-pip.py](!https://bootstrap.pypa.io/get-pip.py)
 
+------------------------------------------------------
+
 to make it portable on windows, use python embed distro
 
-[python-3.8.10-embed](!https://mirrors.huaweicloud.com/python/3.8.10/python-3.8.10-embed-win32.zip)
+[python-3.8.10-embed on huaweicloud.com](!https://mirrors.huaweicloud.com/python/3.8.10/python-3.8.10-embed-win32.zip)
 
 to use pip with python embed, modify `python38._pth` as follow
 
@@ -55,6 +57,17 @@ install packages with command bellow
 
 modify rppi.bat if your path is not the same as mine
 
+to use it with proxy, command with -p http_proxy_url like bellow
+
+```
+rppi -p http://localhost:8118 other_command
+```
+
+to use it with github mirror(esp for network limitation situation), command with -m github_mirror_url, like bellow
+
+```
+rppi -m http://hub.njuu.cf other_command
+```
 
 to install recipe in rppi, use 
 ```
@@ -71,4 +84,9 @@ to update rppi index
 
 ```
 rppi update
+```
+
+to upgrade a repo
+```
+rppi.bat upgrade repo_name_or_keyword
 ```
