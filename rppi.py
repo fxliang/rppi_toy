@@ -148,13 +148,67 @@ def copy_folder_contents(source_folder, destination_folder, exclude_list=[]):
             dest_file = os.path.join(dest_root, file)
             shutil.copy2(src_file, dest_file)
             print(f'copied file: {os.path.abspath(dest_file)}')
-            copied.append('{os.path.abspath(dest_file)}')
+            copied.append(f'{os.path.abspath(dest_file)}')
     return copied
+
+# copy files from src folder to dest folder, exclude files/folder in exclude
+def get_installed_recipe_files(source_folder, destination_folder, exclude_list=[]):
+    # 遍历源文件夹中的所有文件和文件夹
+    installed = []
+    for root, dirs, files in os.walk(source_folder):
+        # 排除清单内的文件夹和文件
+        dirs[:] = [d for d in dirs if d not in exclude_list]
+        files[:] = [f for f in files if f not in exclude_list]
+        # 构建目标文件夹路径
+        dest_root = root.replace(source_folder, destination_folder)
+        # 创建目标文件夹
+        os.makedirs(dest_root, exist_ok=True)
+        # 复制文件
+        for file in files:
+            dest_file = os.path.join(dest_root, file)
+            installed.append(f'{os.path.abspath(dest_file)}')
+    return installed
 
 def get_file_list_for_repo(repo_name=''):
     if repo_name =='':
         return []
     return []
+
+def rppi_remove_by_repo(repo='', auto = False, proxy='', mirror = default_mirror):
+    set_proxy(proxy)
+    if not rppi_update(mirror):
+        print('update rppi failed')
+        return
+    rps = RppiParser.ParseIndex(f'{default_cache_dir}/rppi/index.json')
+    recipes = RppiParser.FilterRecipe(rps, key='repo', value=repo)
+    if len(recipes) > 1:
+        print('find more than 1 recipes, please ensure the recipe name, now to exit')
+        for r in recipes:
+            print(r['name'], r['repo'])
+        return
+    repos = RppiParser.GetAllRecipesDependences(recipes[0])
+    if auto:
+        print('remove follow installed recipes')
+        for r in repos:
+            print(r)
+    for r in repos:
+        local_path = r.split('/')[-1]
+        local_path = f'{default_cache_dir}/{local_path}'
+        if not clone_or_update_repo(mirror + '/' + r + '.git', local_path, False):
+            print(f'clone or upgrade {repo} failed')
+            return
+        dest = get_rime_user_dir()
+        src = local_path
+        files_to_del = get_installed_recipe_files(src, dest, ['.git', 'README.md', 'AUTHORS', 'LICENSE'])
+        for file in files_to_del:
+            try:
+                os.remove(file)
+            except:
+                pass
+            print(f'remove file: {file}')
+        if not auto:
+            break
+    pass
 
 # install a repo
 def rppi_install_by_repo(repo = '', upgrade = False, proxy='', mirror=default_mirror):
@@ -189,18 +243,11 @@ def rppi_install_by_repo(repo = '', upgrade = False, proxy='', mirror=default_mi
                 print('now to upgrade files')
             else:
                 print('no conflicts, now to copy files')
-            dest = './' + get_rime_user_dir()
+            dest = get_rime_user_dir()
             src = local_path
             # todo: make exclude file list or include file list for repo
             # get_file_list_for_repo(local_path)
             copy_folder_contents(src, dest, ['.git', 'README.md', 'AUTHORS', 'LICENSE'])
-    pass
-# remove a repo
-def rppi_remove_by_repo(repo = '', recursive=False, proxy='', mirror=default_mirror):
-    set_proxy(proxy)
-    rppi_update(mirror)
-    rps = RppiParser.ParseIndex('./rppi/index.json')
-    # todo: remove schema recipes
     pass
 # clean cache
 def rppi_clean_cache(cache_dir=default_cache_dir):
@@ -220,11 +267,12 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='sample')
     # add args 
-    parser.add_argument('command', choices=['update', 'install', 'i' ,'search', 's', 'list', 'l', 'upgrade', 'u'], help='command')
+    parser.add_argument('command', choices=['update', 'install', 'i' ,'search', 's', 'list', 'l', 'upgrade', 'u', 'remove', 'purge'], help='command')
     parser.add_argument('value', nargs='?', help='target')
 
     parser.add_argument('-p', required=False, help="proxy url")
     parser.add_argument('-m', required=False, help="mirror url") 
+    #parser.add_argument('-a', required=False, help="automatically remove all")
     ###########################################################################
     # parse args
     args = parser.parse_args()
@@ -241,6 +289,10 @@ if __name__ == '__main__':
     # install recipe by key word or repo name
     elif args.command in ['install', 'i']:
         rppi_install_by_repo(args.value, proxy=g_proxy, mirror=g_mirror)
+    elif args.command == 'remove':
+        rppi_remove_by_repo(args.value, proxy=g_proxy, mirror=g_mirror)
+    elif args.command == 'purge':
+        rppi_remove_by_repo(args.value, auto=True, proxy=g_proxy, mirror=g_mirror)
     # upgrade recipe by key word or repo name
     elif args.command in ['upgrade', 'u']:
         rppi_install_by_repo(args.value, upgrade = True, proxy=g_proxy, mirror=g_mirror)
