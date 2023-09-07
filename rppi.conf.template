@@ -1,0 +1,3 @@
+[config]
+http_proxy = http://localhost:8118
+mirror = https://hub.njuu.cf

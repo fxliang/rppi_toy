@@ -260,10 +260,22 @@ def rppi_list_installed():
     # todo: list schema recipes installed
     pass
 
+import configparser
 # test demos
 if __name__ == '__main__':
     g_proxy = ''
     g_mirror = ''
+
+    config = configparser.ConfigParser()
+    config.read('rppi.conf')
+    try:
+        proxy_conf = config.get('config', 'http_proxy')
+    except:
+        proxy_conf = None
+    try:
+        mirror_conf = config.get('config', 'mirror')
+    except:
+        mirror_conf = None
 
     parser = argparse.ArgumentParser(description='sample')
     # add args 
@@ -277,12 +289,18 @@ if __name__ == '__main__':
     # parse args
     args = parser.parse_args()
     ###########################################################################
+
     if args.p != None:
         g_proxy = args.p
         #print(f'proxy {g_proxy}')
+    elif proxy_conf != None:
+        g_proxy = proxy_conf
+
     if args.m != None:
         g_mirror = args.m
         #print(f'mirror {g_mirror}')
+    elif mirror_conf != None:
+        g_mirror = mirror_conf
     # update rppi index
     if args.command == 'update':
         rppi_update(mirror=g_mirror, proxy=g_proxy)
