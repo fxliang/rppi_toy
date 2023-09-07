@@ -5,6 +5,7 @@ from tqdm import tqdm
 if os.getcwd() not in sys.path:
     sys.path.append(os.getcwd())
 import RppiParser
+import json
 
 if sys.platform == "win32": # Windows
     import winreg
@@ -65,7 +66,7 @@ def clone_or_update_repo(url, local_path, silent=True):
         if repo != None:
             if not silent:
                 print('------------------------------------------------------')
-                print(f'{local_path} repo exists :) \n  now to update {local_path} repo')
+                print(f'{local_path} repo exists :) \n  update {local_path} repo now')
             remote = repo.remotes['origin']
             remote.fetch()
             main_branch = ['master' , 'main']
@@ -182,7 +183,7 @@ def rppi_remove_by_repo(repo='', auto = False, proxy='', mirror = default_mirror
     rps = RppiParser.ParseIndex(f'{default_cache_dir}/rppi/index.json')
     recipes = RppiParser.FilterRecipe(rps, key='repo', value=repo)
     if len(recipes) > 1:
-        print('find more than 1 recipes, please ensure the recipe name, now to exit')
+        print('find more than 1 recipes, please ensure the recipe name, exit now')
         for r in recipes:
             print(r['name'], r['repo'])
         return
@@ -197,6 +198,7 @@ def rppi_remove_by_repo(repo='', auto = False, proxy='', mirror = default_mirror
         if not clone_or_update_repo(mirror + '/' + r + '.git', local_path, False):
             print(f'clone or upgrade {repo} failed')
             return
+        record_remove_repo(r)
         dest = get_rime_user_dir()
         src = local_path
         files_to_del = get_installed_recipe_files(src, dest, ['.git', 'README.md', 'AUTHORS', 'LICENSE'])
@@ -219,20 +221,21 @@ def rppi_install_by_repo(repo = '', upgrade = False, proxy='', mirror=default_mi
     rps = RppiParser.ParseIndex(f'{default_cache_dir}/rppi/index.json')
     recipes = RppiParser.FilterRecipe(rps, key='repo', value=repo)
     if len(recipes) == 0:
-        print('find no recipes, now to exit')
+        print('find no recipes, exit now')
         return
     repos = RppiParser.GetAllRecipesDependences(recipes[0])
     if upgrade:
         action = 'upgrade'
     else:
         action = 'install'
-    print(f"total find {len(recipes)} recipes, now to {action} {recipes[0]['name']} {recipes[0]['repo']}")
+    print(f"total find {len(recipes)} recipes, {action} {recipes[0]['name']} {recipes[0]['repo']} now")
     for r in repos:
         local_path = r.split('/')[-1]
         local_path = f'{default_cache_dir}/{local_path}'
         if not clone_or_update_repo(mirror + '/' + r + '.git', local_path, False):
             print(f'clone or upgrade {repo} failed')
             return
+        record_installed_repo(r)
         conflicts = check_file_conflict(get_rime_user_dir(), local_path)
         if not not conflicts and not upgrade:
             print('conflicts:')
@@ -240,25 +243,67 @@ def rppi_install_by_repo(repo = '', upgrade = False, proxy='', mirror=default_mi
                 print(c)
         else:
             if upgrade:
-                print('now to upgrade files')
+                print('upgrade files now')
             else:
-                print('no conflicts, now to copy files')
+                print('no conflicts, copy files now')
             dest = get_rime_user_dir()
             src = local_path
             # todo: make exclude file list or include file list for repo
             # get_file_list_for_repo(local_path)
             copy_folder_contents(src, dest, ['.git', 'README.md', 'AUTHORS', 'LICENSE'])
     pass
+
+def record_installed_repo(repo):
+    if not os.path.exists('installed.json'):
+        init_data = { 'installed': [repo] }
+        with open('installed.json', 'w') as f:
+            json.dump(init_data, f, indent=2)
+    else:
+        with open('installed.json') as f:
+            data = json.load(f)
+        if repo not in data['installed']:
+            data['installed'].append(repo)
+        with open('installed.json', 'w') as f:
+            json.dump(data, f, indent=2)
+
+def record_remove_repo(repo):
+    if not os.path.exists('installed.json'):
+        init_data = { 'installed': [] }
+        with open('installed.json', 'w') as f:
+            json.dump(init_data, f, indent=2)
+    else:
+        with open('installed.json') as f:
+            data = json.load(f)
+        if repo in data['installed']:
+            data['installed'].remove(repo)
+        with open('installed.json', 'w') as f:
+            json.dump(data, f, indent=2)
+
 # clean cache
 def rppi_clean_cache(cache_dir=default_cache_dir):
     pass
-# list installed recipes
-def rppi_list_installed():
+
+# list installed, available, all recipes
+def rppi_list(param, proxy='', mirror=default_mirror):
     set_proxy(proxy)
-    rppi_update(mirror)
-    rps = RppiParser.ParseIndex('./rppi/index.json')
-    # todo: list schema recipes installed
-    pass
+    rppi_update(mirror = mirror, proxy=proxy)
+    fr = RppiParser.ParseIndex(f'{default_cache_dir}/rppi/index.json')
+    if param == 'all' or param==None:
+        for r in fr:
+            print(r['categories'], r['name'], f"\t{r['repo']}")
+    else:
+        with open('installed.json') as f:
+            data = json.load(f)
+        installed_repoes = data['installed']
+        if param=='installed':
+            for repo in installed_repoes:
+                for r in fr:
+                    if r['repo'] == repo:
+                        print(r['categories'], r['name'], f"\t{r['repo']}")
+        elif param=='available':
+            for r in fr:
+                if r['repo'] not in installed_repoes:
+                    print(r['categories'], r['name'], f"\t{r['repo']}")
 
 import configparser
 # test demos
@@ -284,7 +329,6 @@ if __name__ == '__main__':
 
     parser.add_argument('-p', required=False, help="proxy url")
     parser.add_argument('-m', required=False, help="mirror url") 
-    #parser.add_argument('-a', required=False, help="automatically remove all")
     ###########################################################################
     # parse args
     args = parser.parse_args()
@@ -292,13 +336,11 @@ if __name__ == '__main__':
 
     if args.p != None:
         g_proxy = args.p
-        #print(f'proxy {g_proxy}')
     elif proxy_conf != None:
         g_proxy = proxy_conf
 
     if args.m != None:
         g_mirror = args.m
-        #print(f'mirror {g_mirror}')
     elif mirror_conf != None:
         g_mirror = mirror_conf
     # update rppi index
@@ -307,8 +349,10 @@ if __name__ == '__main__':
     # install recipe by key word or repo name
     elif args.command in ['install', 'i']:
         rppi_install_by_repo(args.value, proxy=g_proxy, mirror=g_mirror)
+    # remove repo only
     elif args.command == 'remove':
         rppi_remove_by_repo(args.value, proxy=g_proxy, mirror=g_mirror)
+    # remove repo and it's dependencies
     elif args.command == 'purge':
         rppi_remove_by_repo(args.value, auto=True, proxy=g_proxy, mirror=g_mirror)
     # upgrade recipe by key word or repo name
@@ -319,5 +363,6 @@ if __name__ == '__main__':
         rppi_search(value=args.value, proxy=g_proxy, mirror=g_mirror)
     # todo: list info
     elif args.command in ['list', 'l']:
+        rppi_list(args.value, proxy=g_proxy, mirror = g_mirror)
         pass
 
