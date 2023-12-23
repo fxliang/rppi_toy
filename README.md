@@ -52,7 +52,7 @@ install pip for python embed with command bellow
 install packages with command bellow
 
 ```
-[path/to/pip/in/python-embed/Script/]pip.exe install tqdm pyyaml luaparser pygit2 argparse 
+[path/to/pip/in/python-embed/Script/]pip.exe install -r requirement.txt
 ```
 
 modify rppi.bat if your path is not the same as mine
