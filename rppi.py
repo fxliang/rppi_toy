@@ -343,6 +343,9 @@ if __name__ == '__main__':
         g_mirror = args.m
     elif mirror_conf != None:
         g_mirror = mirror_conf
+    else:
+        g_mirror = default_mirror
+
     # update rppi index
     if args.command == 'update':
         rppi_update(mirror=g_mirror, proxy=g_proxy)
